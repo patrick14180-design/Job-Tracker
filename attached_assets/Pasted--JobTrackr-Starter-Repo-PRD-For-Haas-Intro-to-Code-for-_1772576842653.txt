@@ -1,0 +1,329 @@
+# JobTrackr — Starter Repo PRD
+
+**For:** Haas Intro to Code for MBAs · Assignment F  
+**Audience:** Whoever builds the starter repo (instructor, GSI, or contractor)  
+**Goal:** A working, deployable job search tracker that students fork and extend via Replit Agent prompting
+
+---
+
+## Purpose of This Document
+
+This PRD specifies everything that needs to be true about the starter repo *before* it's handed to students. The repo is not a toy — it needs to be genuinely functional, well-structured, and complete enough that a beginner can understand it and a Replit Agent can extend it reliably.
+
+Students will not read most of this code. But the Agent will. Structure and naming matter.
+
+---
+
+## Tech Stack
+
+| Layer | Choice | Rationale |
+|---|---|---|
+| Frontend | React (Vite) | Transparent component structure; easier for Agent to reason about than Next.js |
+| Backend | Express.js | Simple, explicit routing; no magic |
+| Database | PostgreSQL | Matches course curriculum; easier cloud integration than SQLite |
+| ORM / Query | `pg` (node-postgres) | Raw SQL so students can see actual queries; no ORM abstraction |
+| Testing | Jest + Supertest | Industry standard; `npm test` just works |
+| Hosting | Replit (dev) + Replit Deploy (prod) | Zero local setup; matches course tooling |
+| Repo structure | Monorepo with `/client` and `/server` | Clear separation; mirrors what students saw in class |
+
+---
+
+## Repo Structure
+
+```
+jobtrackr/
+├── client/
+│   ├── src/
+│   │   ├── App.jsx                  # Main component; renders board + filter
+│   │   ├── components/
+│   │   │   ├── ProspectCard.jsx     # Single card on the board
+│   │   │   ├── AddProspectForm.jsx  # Form to add a new prospect
+│   │   │   └── StatusFilter.jsx     # Placeholder — student builds this in Issue #1
+│   │   ├── main.jsx                 # Vite entry point
+│   │   └── index.css                # Mobile-first base styles
+│   ├── index.html
+│   └── vite.config.js
+├── server/
+│   ├── index.js                     # Express app setup + route registration
+│   ├── db.js                        # PostgreSQL connection pool
+│   ├── routes/
+│   │   └── prospects.js             # All prospect CRUD routes
+│   ├── models/
+│   │   └── prospect.js              # Validation logic + pipeline helpers (pure functions)
+│   ├── migrations/
+│   │   └── 001_create_prospects.sql # Schema definition
+│   └── tests/
+│       └── prospects.test.js        # 5 pre-written passing tests
+├── .env.example                     # Template for environment variables
+├── .gitignore
+├── package.json                     # Root package with scripts for both client + server
+└── README.md                        # Setup instructions
+```
+
+---
+
+## Database Schema
+
+Single table. No joins. Deliberately simple.
+
+```sql
+CREATE TABLE prospects (
+  id              SERIAL PRIMARY KEY,
+  company_name    TEXT NOT NULL,
+  role_title      TEXT NOT NULL,
+  job_url         TEXT,
+  status          TEXT NOT NULL DEFAULT 'Bookmarked',
+  interest_level  TEXT NOT NULL DEFAULT 'Medium',
+  notes           TEXT,
+  thank_you_sent  BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+### Field constraints (enforced in `prospect.js`, not just the DB)
+
+| Field | Constraint |
+|---|---|
+| `company_name` | Required; non-empty string |
+| `role_title` | Required; non-empty string |
+| `status` | Must be one of the 7 valid values (see below) |
+| `interest_level` | Must be one of: `High`, `Medium`, `Low` |
+| `thank_you_sent` | Boolean; defaults to `false` |
+| `job_url`, `notes` | Optional; can be null or empty string |
+
+### Valid status values (ordered — order matters for pipeline logic)
+
+```js
+const STATUSES = [
+  'Bookmarked',
+  'Applied',
+  'Phone Screen',
+  'Interviewing',
+  'Offer',
+  'Rejected',
+  'Withdrawn'
+];
+```
+
+`Rejected` and `Withdrawn` are terminal — the pipeline advance logic skips them.
+
+---
+
+## Pipeline Logic (`server/models/prospect.js`)
+
+This module contains pure functions with no side effects. The Agent needs clean, named functions to hook into. Export all of these.
+
+```js
+// Returns the next status in the pipeline.
+// If already at Offer, Rejected, or Withdrawn — returns the current status unchanged.
+function getNextStatus(currentStatus) { ... }
+
+// Returns true if a prospect's data is valid for saving.
+// Used by both create and update routes.
+function validateProspect(data) { ... }  // returns { valid: Boolean, errors: String[] }
+
+// Returns true if the status is a terminal stage (no further advancement possible)
+function isTerminalStatus(status) { ... }
+```
+
+`getNextStatus` is what the test in Issue #3 will target. It must be a pure function — no DB calls, no Express — so it can be tested in isolation without spinning up a server.
+
+---
+
+## API Routes (`server/routes/prospects.js`)
+
+All routes are prefixed with `/api/prospects`.
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/prospects` | Return all prospects, ordered by `created_at DESC` |
+| `POST` | `/api/prospects` | Create a new prospect; validate before inserting |
+| `PATCH` | `/api/prospects/:id` | Update any field(s) on a prospect |
+| `DELETE` | `/api/prospects/:id` | Delete a prospect |
+
+### Notes on the PATCH route
+
+The `PATCH` route is intentionally flexible — it accepts a partial body and updates only the provided fields. This is what the Agent will use when it wires up the thank-you checkbox in Issue #2. The route should:
+
+- Accept `{ thank_you_sent: true }` as a valid body
+- When `thank_you_sent` is set to `true`, call `getNextStatus()` and update `status` in the same transaction
+- Return the full updated prospect object
+
+This behavior needs to already exist in the PATCH route in the starter repo. The student's Agent will only need to wire up the frontend UI — not architect the backend logic.
+
+---
+
+## Frontend (`client/src/`)
+
+### Mobile-first responsive layout
+
+- Single-column card list on mobile (< 640px)
+- Two-column grid on tablet (640px–1024px)  
+- Three-column grid on desktop (> 1024px)
+- Use CSS Grid or Flexbox — no UI framework (Tailwind, MUI, etc.)
+- Cards should be readable and usable on an iPhone screen without horizontal scrolling
+
+### `App.jsx`
+
+- Fetches all prospects from `GET /api/prospects` on mount
+- Renders the list of `ProspectCard` components
+- Renders `AddProspectForm`
+- Renders `StatusFilter` — **this component is a visible placeholder in the starter** (renders a disabled dropdown with placeholder text "Filter coming soon") so students can see where it lives and the Agent knows exactly what to replace
+
+### `ProspectCard.jsx`
+
+Displays all fields for a single prospect:
+
+- Company name (prominent, card header)
+- Role title
+- Status badge (styled by status — color-coded)
+- Interest level badge (🔥 / 👍 / 🤷)
+- Job URL as a clickable link (if present)
+- Notes (if present; truncated to 2 lines with CSS)
+- `thank_you_sent` checkbox — **rendered in the starter but wired to nothing** (checking it does nothing until the Agent adds the logic in Issue #2)
+- Delete button
+
+### `AddProspectForm.jsx`
+
+Fields:
+- Company name (text input, required)
+- Role title (text input, required)
+- Job URL (text input, optional)
+- Status (select dropdown, defaults to "Bookmarked")
+- Interest level (select dropdown, defaults to "Medium")
+- Notes (textarea, optional)
+
+On submit: POST to `/api/prospects`, then refresh the list.
+
+---
+
+## Pre-Written Tests (`server/tests/prospects.test.js`)
+
+Five tests, all passing, all testing the validation and pipeline logic in `prospect.js`. No HTTP calls — pure unit tests only. Students run `npm test` before starting any issues and see all five pass.
+
+```
+✓ prospect requires a company name
+✓ prospect requires a role title
+✓ status defaults to "Bookmarked" when not provided
+✓ interest level must be High, Medium, or Low
+✓ notes field is optional
+```
+
+### Implementation notes
+
+- Import only from `../models/prospect.js` — no server, no DB, no Express
+- Each test should be 5–8 lines, no setup/teardown boilerplate
+- Use `describe` blocks to group them so the output is readable
+- Tests must pass with `npm test` from the repo root (not from inside `/server`)
+
+### The test students will add (Issue #3)
+
+Students will prompt the Agent to add this test to the same file:
+
+```
+✓ advancing status from Interviewing with thank_you_sent sets status to Offer
+```
+
+The Agent should find `getNextStatus` in `prospect.js` and write a test that calls it directly. This should require minimal Agent reasoning because the function is already named, exported, and pure.
+
+---
+
+## `package.json` Scripts (root)
+
+```json
+{
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "node server/index.js",
+    "client": "vite client/",
+    "test": "jest --testPathPattern=server/tests",
+    "migrate": "psql $DATABASE_URL -f server/migrations/001_create_prospects.sql"
+  }
+}
+```
+
+---
+
+## `.env.example`
+
+```
+DATABASE_URL=postgresql://localhost:5432/jobtrackr
+PORT=3000
+```
+
+Replit injects `DATABASE_URL` automatically when a PostgreSQL database is attached. Students should not need to touch this file.
+
+---
+
+## `README.md` (for students)
+
+The README is a setup guide, not documentation. Keep it short. It should cover:
+
+1. **Fork this repo** — one sentence and a link
+2. **Open in Replit** — one sentence
+3. **Attach a PostgreSQL database** — Replit UI steps (3 steps max)
+4. **Run the migration** — `npm run migrate`
+5. **Start the app** — `npm run dev`
+6. **Confirm it works** — "You should see the app at the URL in the Replit preview panel"
+7. **Run the tests** — `npm test` → 5 tests passing
+
+No architecture explanation. No "how it works." Students learn that through the assignment.
+
+---
+
+## Acceptance Criteria for the Starter Repo
+
+Before handing to students, verify all of the following:
+
+**Functionality**
+- [ ] `npm run dev` starts both client and server with no errors
+- [ ] App loads and is usable on a mobile screen (375px width)
+- [ ] Can add a prospect via the form — it appears in the list
+- [ ] Can delete a prospect — it disappears from the list
+- [ ] `thank_you_sent` checkbox is visible on each card but does nothing when clicked (intentionally inert)
+- [ ] Status filter placeholder is visible but disabled (intentionally inert)
+- [ ] `npm test` runs and all 5 tests pass
+
+**Code quality**
+- [ ] `getNextStatus`, `validateProspect`, and `isTerminalStatus` are exported from `prospect.js`
+- [ ] PATCH route handles `thank_you_sent: true` → calls `getNextStatus` → updates both fields in one DB call
+- [ ] No `console.log` statements left in production code
+- [ ] No commented-out code blocks
+- [ ] Variable and function names are descriptive (Agent-friendly)
+
+**Repo hygiene**
+- [ ] `.env` is in `.gitignore` and not committed
+- [ ] `node_modules` is in `.gitignore`
+- [ ] `.env.example` is committed with placeholder values
+- [ ] Migration file is committed and idempotent (`CREATE TABLE IF NOT EXISTS`)
+- [ ] No unrelated files (no `.DS_Store`, no scratch files)
+
+---
+
+## What the Student's Agent Needs to Be Able to Do
+
+The whole assignment depends on Replit Agent being able to reason about this codebase. Design it accordingly:
+
+| Issue | What the Agent needs to find | Where it lives |
+|---|---|---|
+| #1 — Status filter | The `StatusFilter.jsx` placeholder + the `prospects` state array in `App.jsx` | `client/src/App.jsx`, `client/src/components/StatusFilter.jsx` |
+| #2 — Thank-you checkbox | The inert checkbox in `ProspectCard.jsx` + the PATCH route + `getNextStatus` | `client/src/components/ProspectCard.jsx`, `server/routes/prospects.js`, `server/models/prospect.js` |
+| #3 — Test | The existing test file + `getNextStatus` function | `server/tests/prospects.test.js`, `server/models/prospect.js` |
+| #4 — Deploy | Nothing code-related; Replit UI only | — |
+
+**Design principle:** Every hook the Agent needs is already named and in place. The student's prompt tells the Agent *what* to build; the codebase tells it *where* to build it. The Agent should never need to create a new file from scratch for Issues #1–#3.
+
+---
+
+## Out of Scope
+
+The following are explicitly not part of this spec. Don't build them.
+
+- User authentication / login
+- Multiple users
+- Any external API calls
+- Drag-and-drop Kanban (list view only)
+- Email or notification features
+- Search functionality
+- Pagination
+- Any UI framework (Tailwind, MUI, Bootstrap, etc.)
