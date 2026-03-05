@@ -34,7 +34,7 @@ export const insertProspectSchema = createInsertSchema(prospects).omit({
   roleTitle: z.string().min(1, "Role title is required"),
   status: z.enum(STATUSES).default("Bookmarked"),
   interestLevel: z.enum(INTEREST_LEVELS).default("Medium"),
-  salary: z.number().min(0, "Salary must be a positive number"),
+  salary: z.number({ required_error: "Salary is required. If unknown, make your best guess." }).min(0, "Salary must be a positive number"),
   jobUrl: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
 });
