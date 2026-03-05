@@ -166,13 +166,18 @@ export function AddProspectForm({ onSuccess }: { onSuccess?: () => void }) {
               <FormLabel>Target Salary (optional)</FormLabel>
               <FormControl>
                 <Input
-                  type="number"
-                  placeholder="e.g. 85000"
-                  {...field}
-                  value={field.value ?? ""}
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="e.g. 85,000"
+                  value={field.value != null ? field.value.toLocaleString("en-US", { maximumFractionDigits: 2 }) : ""}
                   onChange={(e) => {
-                    const val = e.target.value;
-                    field.onChange(val === "" ? null : parseInt(val, 10));
+                    const raw = e.target.value.replace(/,/g, "");
+                    if (raw === "") {
+                      field.onChange(null);
+                    } else if (/^\d*\.?\d{0,2}$/.test(raw)) {
+                      const num = parseFloat(raw);
+                      field.onChange(isNaN(num) ? null : num);
+                    }
                   }}
                   data-testid="input-salary"
                 />

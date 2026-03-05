@@ -108,7 +108,7 @@ export function ProspectCard({ prospect }: { prospect: Prospect }) {
           {prospect.salary != null && (
             <span className="inline-flex items-center gap-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400" data-testid={`text-salary-${prospect.id}`}>
               <DollarSign className="w-3 h-3" />
-              {prospect.salary.toLocaleString()}
+              {prospect.salary.toLocaleString("en-US", { minimumFractionDigits: prospect.salary % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 })}
             </span>
           )}
         </div>
