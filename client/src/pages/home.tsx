@@ -82,7 +82,7 @@ function KanbanColumn({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="All" data-testid={`filter-option-all-${statusSlug}`}>
-              All Levels
+              All
             </SelectItem>
             {INTEREST_LEVELS.map((level) => (
               <SelectItem
