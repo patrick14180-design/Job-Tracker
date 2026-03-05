@@ -167,7 +167,7 @@ export function EditProspectForm({ prospect, onSuccess }: EditProspectFormProps)
           name="salary"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Target Salary (optional)</FormLabel>
+              <FormLabel>Target Salary</FormLabel>
               <FormControl>
                 <Input
                   type="text"
@@ -177,7 +177,7 @@ export function EditProspectForm({ prospect, onSuccess }: EditProspectFormProps)
                   onChange={(e) => {
                     const raw = e.target.value.replace(/,/g, "");
                     if (raw === "") {
-                      field.onChange(null);
+                      field.onChange(undefined);
                     } else if (/^\d*\.?\d{0,2}$/.test(raw)) {
                       const num = parseFloat(raw);
                       field.onChange(isNaN(num) ? null : num);
