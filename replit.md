@@ -11,7 +11,8 @@ A Kanban-style job search tracker built with React, Express, and PostgreSQL. Pro
 ## File Structure
 
 ```
-shared/schema.ts              - Database table definition, Zod validation, TypeScript types
+shared/schema.ts              - Database table definition, Zod validation (with location refinements), TypeScript types
+shared/locations.ts           - Country/state data, COUNTRIES list, getStatesForCountry(), isValidStateForCountry()
 server/
   index.ts                    - Express app bootstrap, middleware, server start
   db.ts                       - PostgreSQL connection pool (Drizzle)
@@ -30,10 +31,12 @@ client/src/
 
 ## Database
 
-Single `prospects` table: id, company_name, role_title, job_url, status, interest_level, notes, created_at.
+Single `prospects` table: id, company_name, role_title, job_url, status, interest_level, salary, city, state, country, notes, created_at.
 
 - **Statuses**: Bookmarked, Applied, Phone Screen, Interviewing, Offer, Rejected, Withdrawn
 - **Interest levels**: High, Medium, Low
+- **Location**: city (required), country (required, validated against known list), state (optional, validated against country)
+- **Location data**: `shared/locations.ts` — country list with states/provinces, helper functions
 
 ## API
 

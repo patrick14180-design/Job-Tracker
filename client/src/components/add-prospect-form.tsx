@@ -2,6 +2,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertProspectSchema, STATUSES, INTEREST_LEVELS } from "@shared/schema";
 import type { InsertProspect } from "@shared/schema";
+import { COUNTRIES, getStatesForCountry } from "@shared/locations";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -37,9 +38,15 @@ export function AddProspectForm({ onSuccess }: { onSuccess?: () => void }) {
       status: "Bookmarked",
       interestLevel: "Medium",
       salary: undefined,
+      city: "",
+      country: "",
+      state: "",
       notes: "",
     },
   });
+
+  const selectedCountry = form.watch("country");
+  const states = selectedCountry ? getStatesForCountry(selectedCountry) : [];
 
   const mutation = useMutation({
     mutationFn: async (data: InsertProspect) => {
@@ -181,6 +188,81 @@ export function AddProspectForm({ onSuccess }: { onSuccess?: () => void }) {
                   }}
                   data-testid="input-salary"
                 />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="country"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Country</FormLabel>
+              <Select
+                onValueChange={(val) => {
+                  field.onChange(val);
+                  form.setValue("state", "");
+                }}
+                value={field.value ?? ""}
+              >
+                <FormControl>
+                  <SelectTrigger data-testid="select-country">
+                    <SelectValue placeholder="Select country" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {COUNTRIES.map((c) => (
+                    <SelectItem key={c} value={c} data-testid={`option-country-${c}`}>
+                      {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {states.length > 0 && (
+          <FormField
+            control={form.control}
+            name="state"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>State / Province (optional)</FormLabel>
+                <Select
+                  onValueChange={field.onChange}
+                  value={field.value ?? ""}
+                >
+                  <FormControl>
+                    <SelectTrigger data-testid="select-state">
+                      <SelectValue placeholder="Select state / province" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {states.map((s) => (
+                      <SelectItem key={s} value={s} data-testid={`option-state-${s}`}>
+                        {s}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+
+        <FormField
+          control={form.control}
+          name="city"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>City</FormLabel>
+              <FormControl>
+                <Input placeholder="e.g. San Francisco" {...field} data-testid="input-city" />
               </FormControl>
               <FormMessage />
             </FormItem>

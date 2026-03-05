@@ -39,7 +39,33 @@ export async function registerRoutes(
     if (body.roleTitle !== undefined) updates.roleTitle = body.roleTitle;
     if (body.jobUrl !== undefined) updates.jobUrl = body.jobUrl;
     if (body.salary !== undefined) updates.salary = body.salary;
+    if (body.city !== undefined) updates.city = body.city;
+    if (body.state !== undefined) updates.state = body.state;
+    if (body.country !== undefined) updates.country = body.country;
     if (body.notes !== undefined) updates.notes = body.notes;
+
+    if (updates.country !== undefined || updates.state !== undefined || updates.city !== undefined) {
+      const { COUNTRIES, getStatesForCountry } = await import("@shared/locations");
+      const finalCountry = (updates.country ?? existing.country) as string | null;
+      const finalCity = (updates.city ?? existing.city) as string | null;
+      const finalState = (updates.state ?? existing.state) as string | null;
+
+      if (!finalCity || finalCity.trim() === "") {
+        return res.status(400).json({ message: "City is required" });
+      }
+      if (!finalCountry || finalCountry.trim() === "") {
+        return res.status(400).json({ message: "Country is required" });
+      }
+      if (!COUNTRIES.includes(finalCountry)) {
+        return res.status(400).json({ message: "Invalid country" });
+      }
+      if (finalState && finalState.trim() !== "") {
+        const states = getStatesForCountry(finalCountry);
+        if (states.length > 0 && !states.includes(finalState)) {
+          return res.status(400).json({ message: "Invalid state for selected country" });
+        }
+      }
+    }
 
     if (body.status !== undefined) {
       if (!STATUSES.includes(body.status)) {

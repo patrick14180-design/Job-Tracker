@@ -1,6 +1,7 @@
 import { pgTable, serial, text, timestamp, doublePrecision } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { COUNTRIES, getStatesForCountry } from "./locations";
 
 export const STATUSES = [
   "Bookmarked",
@@ -22,6 +23,9 @@ export const prospects = pgTable("prospects", {
   status: text("status").notNull().default("Bookmarked"),
   interestLevel: text("interest_level").notNull().default("Medium"),
   salary: doublePrecision("salary"),
+  city: text("city"),
+  state: text("state"),
+  country: text("country"),
   notes: text("notes"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -35,9 +39,23 @@ export const insertProspectSchema = createInsertSchema(prospects).omit({
   status: z.enum(STATUSES).default("Bookmarked"),
   interestLevel: z.enum(INTEREST_LEVELS).default("Medium"),
   salary: z.number({ required_error: "Salary is required. If unknown, make your best guess." }).min(0, "Salary must be a positive number"),
+  city: z.string().min(1, "City is required"),
+  country: z.string().min(1, "Country is required").refine(
+    (val) => COUNTRIES.includes(val),
+    { message: "Invalid country" }
+  ),
+  state: z.string().optional().nullable(),
   jobUrl: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
-});
+}).refine(
+  (data) => {
+    if (!data.state || !data.country) return true;
+    const states = getStatesForCountry(data.country);
+    if (states.length === 0) return true;
+    return states.includes(data.state);
+  },
+  { message: "Invalid state for selected country", path: ["state"] }
+);
 
 export type InsertProspect = z.infer<typeof insertProspectSchema>;
 export type Prospect = typeof prospects.$inferSelect;
