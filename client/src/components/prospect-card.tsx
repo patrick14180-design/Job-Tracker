@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Prospect } from "@shared/schema";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, Trash2, Pencil, Flame, ThumbsUp, Minus, DollarSign } from "lucide-react";
+import { ExternalLink, Trash2, Pencil, Flame, ThumbsUp, Minus, DollarSign, MapPin } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -109,6 +109,12 @@ export function ProspectCard({ prospect }: { prospect: Prospect }) {
             <span className="inline-flex items-center gap-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400" data-testid={`text-salary-${prospect.id}`}>
               <DollarSign className="w-3 h-3" />
               {prospect.salary.toLocaleString("en-US", { minimumFractionDigits: prospect.salary % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 })}
+            </span>
+          )}
+          {prospect.country && (
+            <span className="inline-flex items-center gap-0.5 text-xs font-medium text-sky-600 dark:text-sky-400" data-testid={`text-location-${prospect.id}`}>
+              <MapPin className="w-3 h-3" />
+              {[prospect.city, prospect.state, prospect.country].filter(Boolean).join(", ")}
             </span>
           )}
         </div>

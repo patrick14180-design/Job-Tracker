@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { Prospect } from "@shared/schema";
 import { STATUSES, INTEREST_LEVELS } from "@shared/schema";
 import { ProspectCard } from "@/components/prospect-card";
 import { AddProspectForm } from "@/components/add-prospect-form";
-import { Briefcase, Plus, Filter } from "lucide-react";
+import { Briefcase, Plus, Filter, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -45,12 +45,27 @@ function KanbanColumn({
   isLoading: boolean;
 }) {
   const [interestFilter, setInterestFilter] = useState<InterestFilter>("All");
+  const [locationFilter, setLocationFilter] = useState<string>("All");
   const statusSlug = status.replace(/\s+/g, "-").toLowerCase();
 
-  const filteredProspects =
-    interestFilter === "All"
-      ? prospects
-      : prospects.filter((p) => p.interestLevel === interestFilter);
+  const uniqueLocations = useMemo(() => {
+    const locs = new Set<string>();
+    prospects.forEach((p) => {
+      if (p.country) {
+        locs.add([p.city, p.state, p.country].filter(Boolean).join(", "));
+      }
+    });
+    return Array.from(locs).sort();
+  }, [prospects]);
+
+  const filteredProspects = prospects.filter((p) => {
+    if (interestFilter !== "All" && p.interestLevel !== interestFilter) return false;
+    if (locationFilter !== "All") {
+      const loc = [p.city, p.state, p.country].filter(Boolean).join(", ");
+      if (loc !== locationFilter) return false;
+    }
+    return true;
+  });
 
   return (
     <div
@@ -68,7 +83,7 @@ function KanbanColumn({
           {filteredProspects.length}
         </Badge>
       </div>
-      <div className="px-2 pt-2">
+      <div className="px-2 pt-2 space-y-1.5">
         <Select
           value={interestFilter}
           onValueChange={(val) => setInterestFilter(val as InterestFilter)}
@@ -95,6 +110,34 @@ function KanbanColumn({
             ))}
           </SelectContent>
         </Select>
+        {uniqueLocations.length > 0 && (
+          <Select
+            value={locationFilter}
+            onValueChange={setLocationFilter}
+          >
+            <SelectTrigger
+              className="h-7 text-xs w-full"
+              data-testid={`filter-location-${statusSlug}`}
+            >
+              <MapPin className="w-3 h-3 mr-1 shrink-0" />
+              <SelectValue placeholder="Filter by location" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="All" data-testid={`filter-location-all-${statusSlug}`}>
+                All Locations
+              </SelectItem>
+              {uniqueLocations.map((loc) => (
+                <SelectItem
+                  key={loc}
+                  value={loc}
+                  data-testid={`filter-location-option-${statusSlug}`}
+                >
+                  {loc}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
       <div className="flex-1 overflow-y-auto px-2 py-2">
         <div className="space-y-2">
@@ -106,7 +149,9 @@ function KanbanColumn({
           ) : filteredProspects.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center" data-testid={`empty-${statusSlug}`}>
               <p className="text-xs text-muted-foreground">
-                {interestFilter === "All" ? "No prospects" : `No ${interestFilter.toLowerCase()} interest prospects`}
+                {interestFilter === "All" && locationFilter === "All"
+                  ? "No prospects"
+                  : "No matching prospects"}
               </p>
             </div>
           ) : (

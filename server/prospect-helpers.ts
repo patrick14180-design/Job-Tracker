@@ -1,4 +1,5 @@
 import { STATUSES, INTEREST_LEVELS } from "@shared/schema";
+import { COUNTRIES, getStatesForCountry, isValidStateForCountry } from "@shared/locations";
 
 export function getNextStatus(currentStatus: string): string {
   const terminalStatuses = ["Offer", "Rejected", "Withdrawn"];
@@ -45,6 +46,23 @@ export function validateProspect(data: Record<string, unknown>): { valid: boolea
     errors.push("Salary must be a valid number");
   } else if (data.salary < 0) {
     errors.push("Salary must be a positive number");
+  }
+
+  if (!data.city || typeof data.city !== "string" || data.city.trim() === "") {
+    errors.push("City is required");
+  }
+
+  if (!data.country || typeof data.country !== "string" || data.country.trim() === "") {
+    errors.push("Country is required");
+  } else if (!COUNTRIES.includes(data.country as string)) {
+    errors.push("Invalid country");
+  } else {
+    const states = getStatesForCountry(data.country as string);
+    if (data.state && typeof data.state === "string" && data.state.trim() !== "") {
+      if (states.length > 0 && !isValidStateForCountry(data.state as string, data.country as string)) {
+        errors.push("Invalid state for selected country");
+      }
+    }
   }
 
   return { valid: errors.length === 0, errors };
